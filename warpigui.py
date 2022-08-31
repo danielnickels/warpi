@@ -44,8 +44,9 @@ logging.debug(f"HW Clock synced")
 import board
 import busio
 from digitalio import DigitalInOut, Direction, Pull
-from PIL import Image, ImageDraw, ImageFont
-import adafruit_ssd1306
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+#import adafruit_ssd1306
+import SH1106
 from time import sleep, localtime, strftime
 import gpsd
 import psutil
@@ -65,7 +66,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 i2c = busio.I2C(board.SCL, board.SDA)
 
 # Create the SSD1306 OLED class.
-disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
+disp = SH1106.SH1106()
 
 # flip screen that the usb ports from the rpi are on top
 disp.rotation = 2
@@ -103,37 +104,38 @@ def InterruptDown(_):
 
 
 # 5 button A reboot
-GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.add_event_detect(5, GPIO.RISING, callback=InterruptA, bouncetime=300)
+GPIO.setup(21, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.add_event_detect(21, GPIO.RISING, callback=InterruptA, bouncetime=300)
 
 # 6 button B shutdown
-GPIO.setup(6, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.add_event_detect(6, GPIO.RISING, callback=InterruptB, bouncetime=300)
+GPIO.setup(16, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.add_event_detect(16, GPIO.RISING, callback=InterruptB, bouncetime=300)
 
 # Up dir button start
-GPIO.setup(22, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.add_event_detect(22, GPIO.RISING, callback=InterruptUp, bouncetime=300)
+GPIO.setup(6, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.add_event_detect(6, GPIO.RISING, callback=InterruptUp, bouncetime=300)
 
 # Down dir button stop
-GPIO.setup(17, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.add_event_detect(17, GPIO.RISING, callback=InterruptDown, bouncetime=300)
+GPIO.setup(19, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.add_event_detect(19, GPIO.RISING, callback=InterruptDown, bouncetime=300)
 
 # Left dir button (only to check)
-GPIO.setup(23, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.add_event_detect(23, GPIO.RISING, callback=InterruptLeft, bouncetime=300)
+GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.add_event_detect(5, GPIO.RISING, callback=InterruptLeft, bouncetime=300)
 
 
 logging.debug(f"GPIO Setup done")
 
+disp.Init()
+
 # Clear display.
-disp.fill(0)
-disp.show()
+disp.clear()
 
 # Create blank image for drawing.
 # Make sure to create image with mode '1' for 1-bit color.
 width = disp.width
 height = disp.height
-image = Image.new("1", (width, height))
+image = Image.new("1", (width, height), 255)
 
 # Get drawing object to draw on image.
 draw = ImageDraw.Draw(image)
@@ -142,13 +144,13 @@ draw = ImageDraw.Draw(image)
 draw.rectangle((0, 0, width, height), outline=0, fill=0)
 
 # Load a font
-font = ImageFont.truetype("/home/kali/Minecraftia.ttf", 8)
-fontbig = ImageFont.truetype("/home/kali/arial.ttf", 24)
+font = ImageFont.truetype("/home/kali/warpi/minecraftia.ttf", 8)
+fontbig = ImageFont.truetype("/home/kali/warpi/arial.ttf", 24)
 
 logging.debug(f"Display setup done")
 
 # set country code
-# call("iw reg set AT", shell=True)
+#call("iw reg set DE", shell=True)
 
 gpsrun = False
 life = True
@@ -194,8 +196,11 @@ def freboot():
     logging.info(f"Rebooting")
     global looping
     looping = False
-    disp.fill(0)
-    disp.show()
+
+    #disp.fill(0)
+    #disp.show()
+    disp.clear()
+
     subprocess.Popen(["reboot"])
     quit()
 
@@ -210,8 +215,11 @@ def fshutdown():
     logging.debug(f"Kismet shutdown")
     draw.rectangle((0, 0, width, height), outline=0, fill=0)
     draw.text((0, 20), f"Shutdown", font=fontbig, fill=255)
-    disp.image(image)
-    disp.show()
+
+    #disp.image(image)
+    #disp.show()
+    disp.ShowImage(disp.getbuffer(image))
+
     logging.debug(f"LCD Black")
     subprocess.call("sudo shutdown -h now", shell=True)
     logging.debug(f"shutdown -h triggered")
@@ -302,8 +310,10 @@ while looping:
                 startservice()
 
     # draw the screen:
-    disp.image(image)
-    disp.show()
+    #disp.image(image)
+    #disp.show()
+    inverted_image = ImageOps.invert(image)
+    disp.ShowImage(disp.getbuffer(inverted_image))
 
     # wait a bit:
     sleep(sleeptime)
